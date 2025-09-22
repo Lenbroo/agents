@@ -133,6 +133,9 @@ if uploaded_file is not None:
                     row_heights=[0.5, 0.2, 0.3],
                     column_widths=[0.6, 0.4]
                 )
+                
+                # Each agent has 5 traces: 2 bars, 1 violation table, 1 summary table, 1 pie chart.
+                num_traces_per_agent = 5 
 
                 # --- Add all traces (initially visible for the first agent) ---
                 for agent in agents:
@@ -168,17 +171,25 @@ if uploaded_file is not None:
                     total_remaining = agent_donut_data['Total_Remaining'].iloc[0] if not agent_donut_data.empty else 0
                     pie_values = [total_logged_in, total_remaining]
                     fig.add_trace(go.Pie(labels=['Total Logged-in Time', 'Total Remaining Time'], values=pie_values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in pie_values], marker_colors=['#1f77b4', '#e0e0e0'], visible=is_visible, title=dict(text='Overall Time Distribution', position='top center')), row=3, col=2)
-
-                # --- Step 6: Create Buttons for Agent Selection ---
+                
+                # --- Step 6: Create Buttons with CORRECTED Logic ---
                 buttons = []
+                total_traces = len(agents) * num_traces_per_agent
+                
                 for i, agent in enumerate(agents):
-                    visibility = [False] * (len(agents) * 5)
-                    visibility[i*2] = True # Logged-in bar
-                    visibility[i*2 + 1] = True # Remaining bar
-                    visibility[(len(agents) * 2) + i] = True # Violation table
-                    visibility[(len(agents) * 3) + i] = True # Summary table
-                    visibility[(len(agents) * 4) + i] = True # Donut chart
-                    buttons.append(dict(label=agent, method='update', args=[{'visible': visibility}, {'title': f'Daily Performance for: {agent}'}]))
+                    # Create a visibility list that is False for all traces
+                    visibility = [False] * total_traces
+                    
+                    # Set the 5 traces for the current agent to True
+                    start_index = i * num_traces_per_agent
+                    for j in range(num_traces_per_agent):
+                        visibility[start_index + j] = True
+                    
+                    buttons.append(dict(
+                        label=agent,
+                        method='update',
+                        args=[{'visible': visibility}, {'title': f'Daily Performance for: {agent}'}]
+                    ))
 
                 # --- Step 7: Finalize Layout ---
                 fig.update_layout(
