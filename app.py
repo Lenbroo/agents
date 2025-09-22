@@ -172,14 +172,7 @@ if uploaded_file is not None:
 
                 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
-                # --- NEW: Debugging Section ---
-                with st.expander("Show Processed Data for Debugging"):
-                    st.markdown("""
-                    This table shows the final data used to create the charts. 
-                    Check the `Target_seconds` and `Remaining_seconds` columns to verify the calculations. 
-                    Remaining time will be 0 if `Logged_in_seconds` is greater than or equal to `Target_seconds`.
-                    """)
-                    st.dataframe(df_agg)
+
 
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
