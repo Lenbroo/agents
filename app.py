@@ -5,6 +5,7 @@ from plotly.subplots import make_subplots
 from datetime import time
 
 # --- Page Configuration ---
+# This command should be the first in your script.
 st.set_page_config(layout="wide", page_title="Agent Performance Dashboard")
 
 # --- Main Title ---
@@ -118,11 +119,9 @@ if uploaded_file is not None:
                     agent_df = df_agg[df_agg['Agent'] == agent]
                     is_visible = (agent == agents[0])
                     
-                    # Bar Traces with new colors
                     fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Logged_in_seconds'], name='Logged-in Time', marker_color='#007BFF', text=agent_df['Logged_in_text'], textposition='inside', textfont=dict(color='white', size=12), visible=is_visible), row=1, col=1)
                     fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Remaining_seconds'], name='Remaining Time', marker_color='#E9ECEF', text=agent_df['Remaining_text'], textposition='inside', textfont=dict(color='#495057', size=12), visible=is_visible), row=1, col=1)
 
-                    # Violation Table Trace with new colors
                     agent_violations = violations_df[violations_df['Agent'] == agent]
                     if agent_violations.empty:
                         header_values, cell_values = ["Violation Status"], [["No violations recorded"]]
@@ -135,21 +134,18 @@ if uploaded_file is not None:
                         cell_values = [table_df[col] for col in table_df.columns]
                     fig.add_trace(go.Table(header=dict(values=header_values, fill_color='#DC3545', align='left', font=dict(color='white')), cells=dict(values=cell_values, fill_color='#F8D7DA', align='left', font=dict(color='#721C24')), visible=is_visible), row=2, col=1)
 
-                    # Daily Summary Table Trace with new colors
                     agent_summary_df = agent_df[['Day', 'Logged_in_seconds', 'Remaining_seconds']].rename(columns={'Day': 'Date', 'Logged_in_seconds': 'Total Logged-in', 'Remaining_seconds': 'Total Remaining'})
                     agent_summary_df['Date'] = agent_summary_df['Date'].dt.strftime('%Y-%m-%d')
                     agent_summary_df['Total Logged-in'] = agent_summary_df['Total Logged-in'].apply(seconds_to_hms_str)
                     agent_summary_df['Total Remaining'] = agent_summary_df['Total Remaining'].apply(seconds_to_hms_str)
                     fig.add_trace(go.Table(header=dict(values=list(agent_summary_df.columns), fill_color='#6C757D', align='left', font=dict(color='white')), cells=dict(values=[agent_summary_df[col] for col in agent_summary_df.columns], fill_color='#F8F9FA', align='left'), visible=is_visible), row=3, col=1)
 
-                    # Donut Chart Trace with new colors
                     agent_donut_data = donut_data[donut_data['Agent'] == agent]
                     total_logged_in = agent_donut_data['Total_Logged_In'].iloc[0] if not agent_donut_data.empty else 0
                     total_remaining = agent_donut_data['Total_Remaining'].iloc[0] if not agent_donut_data.empty else 0
                     pie_values = [total_logged_in, total_remaining]
                     fig.add_trace(go.Pie(labels=['Total Logged-in', 'Total Remaining'], values=pie_values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in pie_values], marker_colors=['#007BFF', '#E9ECEF'], visible=is_visible, title=dict(text='Overall Time Distribution', position='top center')), row=3, col=2)
                 
-                # --- Step 6: Create Buttons (Logic remains the same) ---
                 buttons = []
                 total_traces = len(agents) * num_traces_per_agent
                 for i, agent in enumerate(agents):
@@ -159,35 +155,35 @@ if uploaded_file is not None:
                         visibility[start_index + j] = True
                     buttons.append(dict(label=agent, method='update', args=[{'visible': visibility}, {'title': f'Daily Performance for: {agent}'}]))
 
-                # --- Step 7: Finalize Layout with new colors ---
                 fig.update_layout(
                     updatemenus=[dict(
                         type="buttons", direction="right", active=0, buttons=buttons,
                         pad={"r": 10, "t": 10}, showactive=True, x=0.5, xanchor="center", y=1.15, yanchor="top"
                     )],
-                    title_text=f'Daily Performance for: {agents[0]}', title_x=0.5,
-                    barmode='stack', height=1000, showlegend=False,
-                    margin=dict(l=40, r=40, t=120, b=40),
-                    # Set transparent background to blend with Streamlit theme
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color="#212529") # Base font color for titles and axes
+                    title_text=f'Daily Performance for: {agents[0]}', title_x=0.5, barmode='stack', height=1000, showlegend=False,
+                    margin=dict(l=40, r=40, t=120, b=40), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="#212529")
                 )
                 fig.update_yaxes(
-                    title_text="Total Time",
-                    tickvals=[i * 3600 for i in range(12)],
-                    ticktext=[f'{i:02d}:00:00' for i in range(12)],
-                    row=1, col=1, gridcolor='#CED4DA' # Lighter grid lines
+                    title_text="Total Time", tickvals=[i * 3600 for i in range(12)], ticktext=[f'{i:02d}:00:00' for i in range(12)],
+                    row=1, col=1, gridcolor='#CED4DA'
                 )
                 fig.update_xaxes(title_text="Date", row=1, col=1, gridcolor='#CED4DA')
 
-                # --- Display the chart in Streamlit ---
                 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+
+                # --- NEW: Debugging Section ---
+                with st.expander("Show Processed Data for Debugging"):
+                    st.markdown("""
+                    This table shows the final data used to create the charts. 
+                    Check the `Target_seconds` and `Remaining_seconds` columns to verify the calculations. 
+                    Remaining time will be 0 if `Logged_in_seconds` is greater than or equal to `Target_seconds`.
+                    """)
+                    st.dataframe(df_agg)
 
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
         st.info("Please ensure your Excel file is correctly formatted and not corrupted.")
 
-# --- Initial Message when no file is uploaded ---
 else:
     st.info("Upload an Excel file to get started.")
