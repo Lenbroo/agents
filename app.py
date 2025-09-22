@@ -11,20 +11,34 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Color Palette ---
+# A more harmonious and professional color scheme
+COLOR_LOGGED_IN = '#0d6efd'         # Primary Blue
+COLOR_REMAINING = '#e9ecef'         # Light Gray
+COLOR_VIOLATION_HEADER = '#f8d7da'  # Soft Red for alerts
+COLOR_VIOLATION_CELL = '#fdf3f4'    # Lighter Red
+COLOR_SUMMARY_HEADER = '#dee2e6'    # Neutral Gray
+COLOR_SUMMARY_CELL = '#f8f9fa'      # Off-White
+COLOR_TEXT_ON_DARK = '#FFFFFF'      # White
+COLOR_TEXT_ON_LIGHT = '#212529'     # Dark Gray (almost black)
+
+
 # --- Main Dashboard Function ---
 def create_dashboard(df):
     """
     Processes the dataframe and generates the Plotly figure.
     """
     # --- Step 2: Data Cleaning and Type Conversion ---
-    if 'Logged Out' not in df.columns:
-        st.error("The 'Logged Out' column is missing from the uploaded file.")
+    # Ensure critical columns exist before processing
+    required_cols = ['Day', 'Agent', 'Logged In', 'Logged Out', 'Total Logged In per day']
+    if not all(col in df.columns for col in required_cols):
+        st.error(f"The uploaded file is missing one of the required columns: {required_cols}")
         return go.Figure()
 
-    df = df.dropna(subset=['Day', 'Logged In', 'Logged Out', 'Total Logged In per day'])
+    df = df.dropna(subset=required_cols)
     df = df[pd.to_datetime(df['Day'], errors='coerce').notna()]
     if df.empty:
-        st.warning("No valid date entries found in the 'Day' column after cleaning.")
+        st.warning("No valid data rows found after initial cleaning. Please check the file content.")
         return go.Figure()
 
     df['Day'] = pd.to_datetime(df['Day'])
@@ -35,6 +49,7 @@ def create_dashboard(df):
 
 
     # --- Step 3: Outside Working Hours (OWH) Logic ---
+    # This logic is confirmed to be identical to the last working standalone script
     def get_violation_reason(dt):
         day_of_week = dt.dayofweek
         time_in_minutes = dt.hour * 60 + dt.minute
@@ -55,6 +70,7 @@ def create_dashboard(df):
     violations_df['Violation Reason'] = violations_df.apply(lambda row: " | ".join(filter(None, [row['Login Violation'], row['Logout Violation']])), axis=1)
 
     # --- Step 4: Chart-Specific Data Aggregation ---
+    # This logic is confirmed to be identical to the last working standalone script
     def get_target_seconds(row):
         day_of_week = row['Day'].dayofweek
         login_time = row['Logged In'].time()
@@ -88,8 +104,7 @@ def create_dashboard(df):
     # --- Step 5: Create the Interactive Figure ---
     fig = make_subplots(
         rows=3, cols=2,
-        shared_xaxes=False,
-        vertical_spacing=0.08,
+        vertical_spacing=0.1,
         specs=[
             [{"type": "bar", "colspan": 2}, None],
             [{"type": "table", "colspan": 2}, None],
@@ -101,7 +116,7 @@ def create_dashboard(df):
 
     agents = df_agg['Agent'].unique()
     if not agents.any():
-        st.warning("No agent data to display after processing.")
+        st.warning("No agent data to display after processing. The file might be empty or formatted incorrectly.")
         return go.Figure()
 
     # --- Add Traces for Each Agent ---
@@ -109,20 +124,20 @@ def create_dashboard(df):
         agent_df = df_agg[df_agg['Agent'] == agent]
         is_visible = (agent == agents[0])
         # Bar Traces
-        fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Logged_in_seconds'], name='Logged-in Time', marker_color='#1f77b4', text=agent_df['Logged_in_text'], textposition='inside', textfont=dict(color='white', size=12), visible=is_visible), row=1, col=1)
-        fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Remaining_seconds'], name='Remaining Time', marker_color='#e0e0e0', text=agent_df['Remaining_text'], textposition='inside', textfont=dict(color='black', size=12), visible=is_visible), row=1, col=1)
+        fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Logged_in_seconds'], name='Logged-in Time', marker_color=COLOR_LOGGED_IN, text=agent_df['Logged_in_text'], textposition='inside', textfont=dict(color=COLOR_TEXT_ON_DARK, size=12), visible=is_visible), row=1, col=1)
+        fig.add_trace(go.Bar(x=agent_df['Day'], y=agent_df['Remaining_seconds'], name='Remaining Time', marker_color=COLOR_REMAINING, text=agent_df['Remaining_text'], textposition='inside', textfont=dict(color=COLOR_TEXT_ON_LIGHT, size=12), visible=is_visible), row=1, col=1)
 
         # Violation Table
         agent_violations = violations_df[violations_df['Agent'] == agent]
         if agent_violations.empty:
-            header_values, cell_values = ["Violation Status"], [["No violations found"]]
+            header_values, cell_values = ["Violation Status"], [["No violations found for this period"]]
         else:
             table_df = agent_violations[['Day', 'Logged In', 'Logged Out', 'Violation Reason']].copy()
             table_df['Day'] = table_df['Day'].dt.strftime('%Y-%m-%d')
             table_df['Logged In'] = table_df['Logged In'].dt.strftime('%H:%M:%S')
             table_df['Logged Out'] = table_df['Logged Out'].dt.strftime('%H:%M:%S')
             header_values, cell_values = list(table_df.columns), [table_df[col] for col in table_df.columns]
-        fig.add_trace(go.Table(header=dict(values=header_values, fill_color='paleturquoise', align='left', font=dict(size=12)), cells=dict(values=cell_values, fill_color='lavender', align='left', font=dict(size=11)), visible=is_visible), row=2, col=1)
+        fig.add_trace(go.Table(header=dict(values=header_values, fill_color=COLOR_VIOLATION_HEADER, font=dict(color=COLOR_TEXT_ON_LIGHT, size=12), align='left'), cells=dict(values=cell_values, fill_color=COLOR_VIOLATION_CELL, align='left', font=dict(size=11)), visible=is_visible), row=2, col=1)
 
         # Daily Summary Table
         agent_summary_df = agent_df[['Day', 'Logged_in_seconds', 'Remaining_seconds']].copy()
@@ -130,29 +145,29 @@ def create_dashboard(df):
         agent_summary_df['Date'] = agent_summary_df['Date'].dt.strftime('%Y-%m-%d')
         agent_summary_df['Total Logged-in'] = agent_summary_df['Total Logged-in'].apply(seconds_to_hms_str)
         agent_summary_df['Total Remaining'] = agent_summary_df['Total Remaining'].apply(seconds_to_hms_str)
-        fig.add_trace(go.Table(header=dict(values=list(agent_summary_df.columns), fill_color='#D3D3D3', align='left', font=dict(size=12, color='black')), cells=dict(values=[agent_summary_df[col] for col in agent_summary_df.columns], fill_color='#F5F5F5', align='left', font=dict(size=11)), visible=is_visible), row=3, col=1)
+        fig.add_trace(go.Table(header=dict(values=list(agent_summary_df.columns), fill_color=COLOR_SUMMARY_HEADER, align='left', font=dict(size=12, color=COLOR_TEXT_ON_LIGHT)), cells=dict(values=[agent_summary_df[col] for col in agent_summary_df.columns], fill_color=COLOR_SUMMARY_CELL, align='left', font=dict(size=11)), visible=is_visible), row=3, col=1)
 
         # Donut Chart
         agent_donut_data = donut_data[donut_data['Agent'] == agent]
         total_logged_in = agent_donut_data['Total_Logged_In'].iloc[0]
         total_remaining = agent_donut_data['Total_Remaining'].iloc[0]
         labels, values = ['Total Logged-in Time', 'Total Remaining Time'], [total_logged_in, total_remaining]
-        fig.add_trace(go.Pie(labels=labels, values=values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in values], marker_colors=['#1f77b4', '#e0e0e0'], visible=is_visible, title=dict(text='Overall Time Distribution', position='top center')), row=3, col=2)
+        fig.add_trace(go.Pie(labels=labels, values=values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in values], marker_colors=[COLOR_LOGGED_IN, COLOR_REMAINING], visible=is_visible, title=dict(text='Overall Time Distribution', position='top center', font=dict(size=14))), row=3, col=2)
 
     # --- Step 6: Create Buttons ---
     buttons = []
     for i, agent in enumerate(agents):
         visibility = [False] * (len(agents) * 5)
-        visibility[i*2] = True; visibility[i*2 + 1] = True  # Bars
-        visibility[len(agents)*2 + i] = True  # Violation Table
-        visibility[len(agents)*3 + i] = True  # Summary Table
-        visibility[len(agents)*4 + i] = True  # Donut
-        buttons.append(dict(label=agent, method='update', args=[{'visible': visibility}, {'title': f'Daily Performance for: {agent}'}]))
+        visibility[i*2] = True; visibility[i*2 + 1] = True
+        visibility[len(agents)*2 + i] = True
+        visibility[len(agents)*3 + i] = True
+        visibility[len(agents)*4 + i] = True
+        buttons.append(dict(label=agent, method='update', args=[{'visible': visibility}, {'title': f'Daily Performance Dashboard for: {agent}'}]))
 
     # --- Step 7: Finalize Layout ---
     fig.update_layout(
         updatemenus=[dict(type="buttons", direction="right", active=0, buttons=buttons, pad={"r": 10, "t": 10}, showactive=True, x=0.5, xanchor="center", y=1.15, yanchor="top")],
-        title_text=f'Daily Performance for: {agents[0]}', title_x=0.5, barmode='stack', height=1000, showlegend=False, margin=dict(l=40, r=40, t=120, b=40)
+        title_text=f'Daily Performance Dashboard for: {agents[0]}', title_x=0.5, barmode='stack', height=1000, showlegend=False, margin=dict(l=40, r=40, t=120, b=40)
     )
     fig.update_yaxes(title_text="Total Time", tickvals=[i * 3600 for i in range(12)], ticktext=[f'{i:02d}:00:00' for i in range(12)], row=1, col=1)
     fig.update_xaxes(title_text="Date", row=1, col=1)
@@ -170,31 +185,21 @@ Upload your agent activity Excel file to visualize daily performance, violations
 with st.sidebar:
     st.header("Upload Data")
     uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
-    st.info("If no file is uploaded, the dashboard will load with sample data.")
 
-# --- Data Loading Logic ---
+# --- Main Panel Display Logic ---
 if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file, header=0)
         df.columns = df.columns.str.strip()
-        st.sidebar.success("File uploaded and loaded successfully!")
+        
+        with st.spinner('Processing data and generating visuals...'):
+            fig = create_dashboard(df)
+            st.plotly_chart(fig, use_container_width=True)
+            
     except Exception as e:
-        st.error(f"Error reading the Excel file: {e}")
-        df = None
+        st.error(f"An error occurred while processing the file: {e}")
+        st.warning("Please ensure the file is a valid Excel file and the column names are correct.")
 else:
-    # Sample Data as fallback
-    df = pd.DataFrame({
-        'Day': ['2025-09-22', '2025-09-23', '2025-09-24', '2025-09-25', '2025-09-26', '2025-09-22', '2025-09-23'],
-        'Agent': ['Agent A', 'Agent A', 'Agent A', 'Agent A', 'Agent B', 'Agent B', 'Agent B'],
-        'Logged In': ['2025-09-22T07:55:00', '2025-09-23T21:30:00', '2025-09-24T08:10:00', '2025-09-25T14:00:00', '2025-09-26T12:30:00', '2025-09-22T09:05:00', '2025-09-23T10:00:00'],
-        'Logged Out': ['2025-09-22T17:00:00', '2025-09-23T22:00:00', '2025-09-24T16:00:00', '2025-09-25T18:00:00', '2025-09-26T21:00:00', '2025-09-22T18:00:00', '2025-09-23T15:00:00'],
-        'Total Logged In per day': ['08:05:00', '00:30:00', '07:50:00', '04:00:00', '08:30:00', '08:55:00', '05:00:00']
-    })
+    # Show this message if no file is uploaded
+    st.info("Please upload an agent activity file using the sidebar to generate the dashboard.")
 
-# --- Display Dashboard ---
-if df is not None:
-    with st.spinner('Processing data and generating visuals...'):
-        fig = create_dashboard(df)
-        st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("Please upload a valid Excel file to proceed.")
