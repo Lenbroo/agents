@@ -144,7 +144,7 @@ if uploaded_file is not None:
                     total_logged_in = agent_donut_data['Total_Logged_In'].iloc[0] if not agent_donut_data.empty else 0
                     total_remaining = agent_donut_data['Total_Remaining'].iloc[0] if not agent_donut_data.empty else 0
                     pie_values = [total_logged_in, total_remaining]
-                    fig.add_trace(go.Pie(labels=['Total Logged-in', 'Total Remaining'], values=pie_values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in pie_values], marker_colors=['#007BFF', '#E9ECEF'], visible=is_visible, title=dict(text='Overall Time Distribution', position='top center')), row=3, col=2)
+                    fig.add_trace(go.Pie(labels=['Total Logged-in', 'Total Remaining'], values=pie_values, hole=0.4, textinfo='percent+label', texttemplate='%{label}<br>%{percent}', hoverinfo='label+value', hovertemplate='%{label}: %{customdata}<extra></extra>', customdata=[seconds_to_hms_str(s) for s in pie_values], marker_colors=['#007BFF', '#E9ECEF'], visible=is_visible, position='top center')), row=3, col=2)
                 
                 buttons = []
                 total_traces = len(agents) * num_traces_per_agent
